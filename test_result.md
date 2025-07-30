@@ -438,7 +438,19 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All backend API endpoints tested and verified"
+    - "App Loading and Initial Data"
+    - "Theme Toggle Functionality"
+    - "Create Text Memo"
+    - "Create Memo with Alarm"
+    - "Image Upload Functionality"
+    - "Edit Memo Functionality"
+    - "Delete Memo Functionality"
+    - "Toggle Alarm Functionality"
+    - "Search Functionality"
+    - "Filter Options"
+    - "View Modes (Grid/List)"
+    - "Responsive Design"
+    - "Notification System"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
