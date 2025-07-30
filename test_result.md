@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the Time Notes backend API thoroughly with all endpoints and functionality"
+user_problem_statement: "Test the Time Notes app frontend with full-stack integration. Please verify all functionality works correctly including app loading, theme toggle, memo creation/editing/deletion, image upload, alarm functionality, search/filter, view modes, and responsive design."
 
 backend:
   - task: "Health Check Endpoint"
