@@ -5,8 +5,9 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
-import { Camera, Upload, X, Bell, Clock } from 'lucide-react';
+import { Camera, Upload, X, Bell, Clock, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { imageApi } from '../services/api';
 
 const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
   const [title, setTitle] = useState('');
@@ -15,6 +16,7 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [alarmEnabled, setAlarmEnabled] = useState(false);
   const [alarmTime, setAlarmTime] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -29,7 +31,18 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
       setTitle(memo.title || '');
       setContent(memo.content || '');
       setImage(memo.image);
-      setImagePreview(memo.image);
+      
+      // Set image preview - use API URL if it's a filename, otherwise use the URL directly
+      if (memo.image) {
+        if (memo.image.startsWith('http') || memo.image.startsWith('data:')) {
+          setImagePreview(memo.image);
+        } else {
+          setImagePreview(imageApi.getImageUrl(memo.image));
+        }
+      } else {
+        setImagePreview(null);
+      }
+      
       setAlarmEnabled(memo.alarm?.enabled || false);
       if (memo.alarm?.time) {
         const date = new Date(memo.alarm.time);
@@ -49,10 +62,11 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
     setImagePreview(null);
     setAlarmEnabled(false);
     setAlarmTime('');
+    setIsUploading(false);
     stopCamera();
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -64,13 +78,25 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
         return;
       }
       
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target.result;
-        setImage(result);
-        setImagePreview(result);
-      };
-      reader.readAsDataURL(file);
+      setIsUploading(true);
+      try {
+        const uploadResult = await imageApi.uploadImage(file);
+        setImage(uploadResult.filename);
+        setImagePreview(imageApi.getImageUrl(uploadResult.filename));
+        
+        toast({
+          title: "Success",
+          description: "Image uploaded successfully"
+        });
+      } catch (error) {
+        toast({
+          title: "Upload Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -101,7 +127,7 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
     setIsCapturing(false);
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current && canvasRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
@@ -113,9 +139,28 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
       ctx.drawImage(video, 0, 0);
       
       const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      setImage(imageData);
-      setImagePreview(imageData);
-      stopCamera();
+      
+      setIsUploading(true);
+      try {
+        const uploadResult = await imageApi.uploadBase64Image(imageData, `camera-${Date.now()}.jpg`);
+        setImage(uploadResult.filename);
+        setImagePreview(imageApi.getImageUrl(uploadResult.filename));
+        
+        toast({
+          title: "Success",
+          description: "Photo captured and uploaded successfully"
+        });
+        
+        stopCamera();
+      } catch (error) {
+        toast({
+          title: "Upload Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -210,6 +255,7 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
                   size="icon"
                   className="absolute top-2 right-2 h-6 w-6"
                   onClick={removeImage}
+                  disabled={isUploading}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -221,8 +267,13 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
                   variant="outline"
                   className="flex-1"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading || isCapturing}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 mr-2" />
+                  )}
                   Upload
                 </Button>
                 <Button
@@ -230,6 +281,7 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
                   variant="outline"
                   className="flex-1"
                   onClick={startCamera}
+                  disabled={isUploading || isCapturing}
                 >
                   <Camera className="w-4 h-4 mr-2" />
                   Camera
@@ -257,13 +309,18 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
                     type="button"
                     onClick={capturePhoto}
                     className="flex-1"
+                    disabled={isUploading}
                   >
+                    {isUploading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
                     Capture Photo
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={stopCamera}
+                    disabled={isUploading}
                   >
                     Cancel
                   </Button>
@@ -308,7 +365,10 @@ const MemoModal = ({ isOpen, onClose, memo, onSave }) => {
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={isUploading}>
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
               {memo ? 'Update Memo' : 'Create Memo'}
             </Button>
           </div>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { formatDistanceToNow } from 'date-fns';
+import { imageApi } from '../services/api';
 
 const MemoCard = ({ memo, onEdit, onDelete, onToggleAlarm }) => {
   const formatAlarmTime = (time) => {
@@ -22,6 +23,18 @@ const MemoCard = ({ memo, onEdit, onDelete, onToggleAlarm }) => {
     const alarmTime = new Date(time);
     const diff = alarmTime.getTime() - now.getTime();
     return diff > 0 && diff <= 24 * 60 * 60 * 1000; // Within 24 hours
+  };
+
+  const getImageUrl = (imageFilename) => {
+    if (!imageFilename) return null;
+    
+    // If it's already a full URL, return as is
+    if (imageFilename.startsWith('http') || imageFilename.startsWith('data:')) {
+      return imageFilename;
+    }
+    
+    // Otherwise, construct the API URL
+    return imageApi.getImageUrl(imageFilename);
   };
 
   return (
@@ -47,9 +60,13 @@ const MemoCard = ({ memo, onEdit, onDelete, onToggleAlarm }) => {
         {memo.image && (
           <div className="mb-3 rounded-lg overflow-hidden">
             <img 
-              src={memo.image} 
+              src={getImageUrl(memo.image)} 
               alt="Memo" 
               className="w-full h-32 object-cover hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                console.warn('Failed to load image:', memo.image);
+              }}
             />
           </div>
         )}
@@ -61,7 +78,7 @@ const MemoCard = ({ memo, onEdit, onDelete, onToggleAlarm }) => {
         <div className="flex items-center text-xs text-muted-foreground space-x-4">
           <div className="flex items-center space-x-1">
             <Calendar className="w-3 h-3" />
-            <span>{formatDistanceToNow(new Date(memo.createdAt), { addSuffix: true })}</span>
+            <span>{formatDistanceToNow(new Date(memo.created_at), { addSuffix: true })}</span>
           </div>
           {memo.alarm?.time && (
             <div className="flex items-center space-x-1">

@@ -6,7 +6,7 @@ import Layout from './components/Layout';
 import MemoList from './components/MemoList';
 import MemoModal from './components/MemoModal';
 import NotificationSystem from './components/NotificationSystem';
-import { getMemos, createMemo, updateMemo, deleteMemo } from './mock/mockData';
+import { memoApi } from './services/api';
 import { useToast } from './hooks/use-toast';
 import "./App.css";
 
@@ -14,6 +14,7 @@ function AppContent() {
   const [memos, setMemos] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMemo, setEditingMemo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   // Load memos on component mount
@@ -23,7 +24,8 @@ function AppContent() {
 
   const loadMemos = async () => {
     try {
-      const data = await getMemos();
+      setIsLoading(true);
+      const data = await memoApi.getMemos();
       setMemos(data);
     } catch (error) {
       toast({
@@ -31,6 +33,8 @@ function AppContent() {
         description: "Failed to load memos",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -47,14 +51,12 @@ function AppContent() {
   const handleSaveMemo = async (memoData) => {
     try {
       if (editingMemo) {
-        await updateMemo(editingMemo.id, memoData);
+        const updatedMemo = await memoApi.updateMemo(editingMemo.id, memoData);
         setMemos(prev => prev.map(memo => 
-          memo.id === editingMemo.id 
-            ? { ...memo, ...memoData, updatedAt: new Date().toISOString() }
-            : memo
+          memo.id === editingMemo.id ? updatedMemo : memo
         ));
       } else {
-        const newMemo = await createMemo(memoData);
+        const newMemo = await memoApi.createMemo(memoData);
         setMemos(prev => [newMemo, ...prev]);
       }
       setIsModalOpen(false);
@@ -62,7 +64,7 @@ function AppContent() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save memo",
+        description: error.message,
         variant: "destructive"
       });
     }
@@ -71,7 +73,7 @@ function AppContent() {
   const handleDeleteMemo = async (memo) => {
     if (window.confirm('Are you sure you want to delete this memo?')) {
       try {
-        await deleteMemo(memo.id);
+        await memoApi.deleteMemo(memo.id);
         setMemos(prev => prev.filter(m => m.id !== memo.id));
         toast({
           title: "Success",
@@ -80,7 +82,7 @@ function AppContent() {
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to delete memo",
+          description: error.message,
           variant: "destructive"
         });
       }
@@ -89,30 +91,38 @@ function AppContent() {
 
   const handleToggleAlarm = async (memo) => {
     try {
-      const updatedAlarm = {
-        ...memo.alarm,
-        enabled: !memo.alarm?.enabled
-      };
-      
-      await updateMemo(memo.id, { alarm: updatedAlarm });
+      const updatedMemo = await memoApi.toggleAlarm(memo.id);
       setMemos(prev => prev.map(m => 
-        m.id === memo.id 
-          ? { ...m, alarm: updatedAlarm, updatedAt: new Date().toISOString() }
-          : m
+        m.id === memo.id ? updatedMemo : m
       ));
       
       toast({
-        title: updatedAlarm.enabled ? "Alarm enabled" : "Alarm disabled",
-        description: `Alarm for "${memo.title}" has been ${updatedAlarm.enabled ? 'enabled' : 'disabled'}`
+        title: updatedMemo.alarm.enabled ? "Alarm enabled" : "Alarm disabled",
+        description: `Alarm for "${memo.title}" has been ${updatedMemo.alarm.enabled ? 'enabled' : 'disabled'}`
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to toggle alarm",
+        description: error.message,
         variant: "destructive"
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
+        <Layout>
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading your memos...</p>
+            </div>
+          </div>
+        </Layout>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
